@@ -1,11 +1,11 @@
 #!/usr/bin/perl -w 
 ############################## check_snmp_load #################
-my $Version='1.12';
-# Date : Oct 12 2007
+my $Version='1.13';
+# Date : Sep 07 2018
 # Author  : Patrick Proy ( patrick at proy.org)
 # Help : http://nagios.manubulon.com/
 # Licence : GPL - http://www.fsf.org/licenses/gpl.txt
-# Contributors : F. Lacroix and many others !!!
+# Contributors : F. Lacroix, Fredric Johansson and many others !!!
 #################################################################
 #
 # Help : ./check_snmp_load.pl -h
