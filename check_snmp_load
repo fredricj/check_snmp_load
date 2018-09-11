@@ -92,30 +92,30 @@ my %cpu_oid = ("netsc",$ns_cpu_idle,"as400",$as400_cpu,"bc",$bluecoat_cpu,"nokia
 # Globals
 
 
-my $o_host = 	undef; 		# hostname
-my $o_community = undef; 	# community
-my $o_port = 	161; 		# port
-my $o_domain=	"udp";		# use tcp or udp, ipv4 or ipv6
-my $o_help=	undef; 		# wan't some help ?
-my $o_verb=	undef;		# verbose mode
-my $o_version=	undef;		# print version
+my $o_host =        undef;      # hostname
+my $o_community =   undef;      # community
+my $o_port =        161;        # port
+my $o_domain =      "udp";      # use tcp or udp, ipv4 or ipv6
+my $o_help =        undef;      # wan't some help ?
+my $o_verb =        undef;      # verbose mode
+my $o_version =     undef;      # print version
 # check type  : stand | netsc |  netsl | as400 | cisco | cata | nsc | fg | bc | nokia | hp | lp  | hpux
-my $o_check_type= "stand";	
+my $o_check_type =  "stand";
 # End compatibility
-my $o_warn=	undef;		# warning level
-my @o_warnL=	undef;		# warning levels for Linux Load or Cisco CPU
-my $o_crit=	undef;		# critical level
-my @o_critL=	undef;		# critical level for Linux Load or Cisco CPU
-my $o_timeout=  undef; 		# Timeout (Default 5)
-my $o_perf=     undef;          # Output performance data
-my $o_version2= undef;          # use snmp v2c
+my $o_warn =        undef;      # warning level
+my @o_warnL =       undef;      # warning levels for Linux Load or Cisco CPU
+my $o_crit =        undef;      # critical level
+my @o_critL =       undef;      # critical level for Linux Load or Cisco CPU
+my $o_timeout =     undef;      # Timeout (Default 5)
+my $o_perf =        undef;      # Output performance data
+my $o_version2 =    undef;      # use snmp v2c
 # SNMPv3 specific
-my $o_login=	undef;		# Login for snmpv3
-my $o_passwd=	undef;		# Pass for snmpv3
-my $v3protocols=undef;	# V3 protocol list.
-my $o_authproto='md5';		# Auth protocol
-my $o_privproto='des';		# Priv protocol
-my $o_privpass= undef;		# priv password
+my $o_login =       undef;      # Login for snmpv3
+my $o_passwd =      undef;      # Pass for snmpv3
+my $v3protocols =   undef;      # V3 protocol list.
+my $o_authproto =   'md5';      # Auth protocol
+my $o_privproto =   'des';      # Priv protocol
+my $o_privpass =    undef;      # priv password
 
 # functions
 
