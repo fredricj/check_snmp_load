@@ -14,11 +14,11 @@ my $Version='1.13';
 use strict;
 use Net::SNMP;
 use Getopt::Long;
+use Monitoring::Plugin;
 
-# Nagios specific
+my $Name = 'check_snmp_load';
 
-my $TIMEOUT = 15;
-my %ERRORS=('OK'=>0,'WARNING'=>1,'CRITICAL'=>2,'UNKNOWN'=>3,'DEPENDENT'=>4);
+my $np;
 
 # SNMP Datas
 
@@ -29,9 +29,9 @@ my $proc_load = "1.3.6.1.2.1.25.3.3.1.2"; # %time the proc was not idle over las
 
 # Linux load 
 
-my $linload_table= "1.3.6.1.4.1.2021.10.1";   # net-snmp load table
-my $linload_name = "1.3.6.1.4.1.2021.10.1.2"; # text 'Load-1','Load-5', 'Load-15'
-my $linload_load = "1.3.6.1.4.1.2021.10.1.3"; # effective load table
+my $linload_table = "1.3.6.1.4.1.2021.10.1";   # net-snmp load table
+my $linload_name  = "1.3.6.1.4.1.2021.10.1.2"; # text 'Load-1','Load-5', 'Load-15'
+my $linload_load  = "1.3.6.1.4.1.2021.10.1.3"; # effective load table
 
 # Cisco cpu/load
 
@@ -74,56 +74,50 @@ my $bluecoat_cpu = "1.3.6.1.4.1.3417.2.4.1.1.1.4.1"; # Bluecoat %cpu usage.
 my $fortigate_cpu = ".1.3.6.1.4.1.12356.1.8.0"; # Fortigate CPU % usage
 
 # Linkproof Appliance
-my $linkproof_cpu= "1.3.6.1.4.1.89.35.1.55.0"; # CPU RE (Routing Engine Tasks)
+my $linkproof_cpu = "1.3.6.1.4.1.89.35.1.55.0"; # CPU RE (Routing Engine Tasks)
 # 1.3.6.1.4.1.89.35.1.53.0 : Ressource utilisation (%) Considers network utilization and internal CPU utilization
 # 1.3.6.1.4.1.89.35.1.54 : CPU only (%)
 # 1.3.6.1.4.1.89.35.1.55 : network only (%)
 
 # HP-UX cpu usage (thanks to krizb for the OIDs).
-my $hpux_load_1_min="1.3.6.1.4.1.11.2.3.1.1.3.0";
-my $hpux_load_5_min="1.3.6.1.4.1.11.2.3.1.1.4.0";
-my $hpux_load_15_min="1.3.6.1.4.1.11.2.3.1.1.5.0";
+my $hpux_load_1_min  = "1.3.6.1.4.1.11.2.3.1.1.3.0";
+my $hpux_load_5_min  = "1.3.6.1.4.1.11.2.3.1.1.4.0";
+my $hpux_load_15_min = "1.3.6.1.4.1.11.2.3.1.1.5.0";
  
 # valid values 
-my @valid_types = ("stand","netsc","netsl","as400","cisco","cata","nsc","fg","bc","nokia","hp","lp","hpux");
+my @valid_types = ("stand", "netsc", "netsl", "as400", "cisco", "cata", "nsc", "fg", "bc", "nokia", "hp", "lp", "hpux");
 # CPU OID array
-my %cpu_oid = ("netsc",$ns_cpu_idle,"as400",$as400_cpu,"bc",$bluecoat_cpu,"nokia",$nokia_cpu,"hp",$procurve_cpu,"lp",$linkproof_cpu,"fg",$fortigate_cpu);
+my %cpu_oid = ("netsc", $ns_cpu_idle, "as400", $as400_cpu, "bc", $bluecoat_cpu, "nokia", $nokia_cpu, "hp", $procurve_cpu, "lp", $linkproof_cpu, "fg", $fortigate_cpu);
 
 # Globals
 
 
-my $o_host =        undef;      # hostname
-my $o_community =   undef;      # community
-my $o_port =        161;        # port
-my $o_domain =      "udp";      # use tcp or udp, ipv4 or ipv6
-my $o_help =        undef;      # wan't some help ?
-my $o_verb =        undef;      # verbose mode
-my $o_version =     undef;      # print version
+my $o_host          = undef;    # hostname
+my $o_community     = undef;    # community
+my $o_port          = 161;       # port
+my $o_domain        = "udp";     # use tcp or udp, ipv4 or ipv6
+my $o_verb          = undef;    # verbose mode
 # check type  : stand | netsc |  netsl | as400 | cisco | cata | nsc | fg | bc | nokia | hp | lp  | hpux
-my $o_check_type =  "stand";
+my $o_check_type    = "stand";
 # End compatibility
-my $o_warn =        undef;      # warning level
-my @o_warnL =       undef;      # warning levels for Linux Load or Cisco CPU
-my $o_crit =        undef;      # critical level
-my @o_critL =       undef;      # critical level for Linux Load or Cisco CPU
-my $o_timeout =     undef;      # Timeout (Default 5)
-my $o_perf =        undef;      # Output performance data
-my $o_version2 =    undef;      # use snmp v2c
+my $o_warn          = undef;    # warning level
+my @o_warnL         = undef;    # warning levels for Linux Load or Cisco CPU
+my $o_crit          = undef;    # critical level
+my @o_critL         = undef;    # critical level for Linux Load or Cisco CPU
+my $o_timeout       = undef;    # Timeout
+my $o_perf          = undef;    # Output performance data
+my $o_version2      = undef;    # use snmp v2c
 # SNMPv3 specific
-my $o_login =       undef;      # Login for snmpv3
-my $o_passwd =      undef;      # Pass for snmpv3
-my $v3protocols =   undef;      # V3 protocol list.
-my $o_authproto =   'md5';      # Auth protocol
-my $o_privproto =   'des';      # Priv protocol
-my $o_privpass =    undef;      # priv password
+my $o_login         = undef;    # Login for snmpv3
+my $o_passwd        = undef;    # Pass for snmpv3
+my $v3protocols     = undef;    # V3 protocol list.
+my $o_authproto     = 'md5';     # Auth protocol
+my $o_privproto     = 'des';     # Priv protocol
+my $o_privpass      = undef;    # priv password
 
 # functions
 
-sub p_version { print "check_snmp_load version : $Version\n"; }
-
-sub print_usage {
-    print "Usage: $0 [-v] -H <host> -C <snmp_community> [-2] | (-l login -x passwd [-X pass -L <authp>,<privp>])  [-p <port>] -w <warn level> -c <crit level> -T=[stand|netsl|netsc|as400|cisco|cata|nsc|fg|bc|nokia|hp|lp|hpux] [-f] [-t <timeout>] [-V]\n";
-}
+my $usage = "Usage: $0 [-v] -H <host> -C <snmp_community> [-2] | (-l login -x passwd [-X pass -L <authp>,<privp>])  [-p <port>] -w <warn level> -c <crit level> -T=[stand|netsl|netsc|as400|cisco|cata|nsc|fg|bc|nokia|hp|lp|hpux] [-f] [-t <timeout>] [-V]\n";
 
 sub isnnum { # Return true if arg is not a number
     my $num = shift;
@@ -133,42 +127,78 @@ sub isnnum { # Return true if arg is not a number
     return 1;
 }
 
-sub help {
-    print "\nSNMP Load & CPU Monitor for Nagios version ",$Version,"\n";
-    print "GPL licence, (c)2004-2007 Patrick Proy\n\n";
-    print_usage();
-    print <<EOT;
--v, --verbose
-   print extra debugging information 
--h, --help
-   print this help message
--H, --hostname=HOST
-   name or IP address of host to check
--C, --community=COMMUNITY NAME
-   community name for the host's SNMP agent (implies v1 protocol)
--2, --v2c
-   Use snmp v2c
--l, --login=LOGIN ; -x, --passwd=PASSWD
-   Login and auth password for snmpv3 authentication 
-   If no priv password exists, implies AuthNoPriv 
--X, --privpass=PASSWD
-   Priv password for snmpv3 (AuthPriv protocol)
--L, --protocols=<authproto>,<privproto>
-   <authproto> : Authentication protocol (md5|sha : default md5)
-   <privproto> : Priv protocole (des|aes : default des) 
--P, --port=PORT
-   SNMP port (Default 161)
--D, --domain=DOMAIN
-   Selects the transport protocol: udp or tcp. (tcp|tcp6|udp|udp6 : default udp)
--w, --warn=INTEGER | INT,INT,INT
-   1 value check : warning level for cpu in percent (on one minute)
-   3 value check : comma separated level for load or cpu for 1min, 5min, 15min 
--c, --crit=INTEGER | INT,INT,INT
-   critical level for cpu in percent (on one minute)
-   1 value check : critical level for cpu in percent (on one minute)
-   3 value check : comma separated level for load or cpu for 1min, 5min, 15min 
--T, --type=stand|netsl|netsc|as400|cisco|bc|nokia|hp|lp
-    CPU check : 
+# For verbose output
+sub verb {
+    my $t = shift;
+    print $t, "\n" if $o_verb;
+}
+
+sub check_options {
+    $np->add_arg(
+        spec => 'hostname|H=s',
+        help => 'name or IP address of host to check',
+        label => 'HOST',
+        required => 1
+    );
+    $np->add_arg(
+        spec => 'port|p=i',
+        help => 'SNMP port (Default %s)',
+        label => 'PORT',
+        default => $o_port
+    );
+    $np->add_arg(
+        spec => 'domain|D=s',
+        help => 'Selects the transport protocol: udp or tcp. (tcp|tcp6|udp|udp6 : default %s)',
+        label => '<tcp|tcp6|udp|udp6>',
+        default => 'udp'
+    );
+    $np->add_arg(
+        spec => 'community|C=s',
+        help => 'community name for the host\'s SNMP agent (implies SNMP v1 or v2c with option)',
+        label => 'COMMUNITY_NAME'
+    );
+    $np->add_arg(
+        spec => 'v2c|2',
+        help => 'Use snmp v2c'
+    );
+    $np->add_arg(
+        spec => 'login|l=s',
+        help => 'Login password for snmpv3 authentication '
+    );
+    $np->add_arg(
+        spec => 'passwd|x=s',
+        help => 'Auth password for snmpv3 authentication
+   If no priv password exists, implies AuthNoPriv',
+        label => 'PASSWD'
+    );
+    $np->add_arg(
+        spec => 'privpass|X=s',
+        help => 'Priv password for snmpv3 (AuthPriv protocol)',
+        label => 'PASSWD'
+    );
+    $np->add_arg(
+        spec => 'protocols|L=s',
+        help => '<authproto> : Authentication protocol (md5|sha : default md5)
+   <privproto> : Priv protocole (des|aes : default des)',
+        label => '<authproto>,<privproto>'
+    );
+    $np->add_arg(
+        spec => 'warn|w=s',
+        help => '1 value check : warning level for cpu in percent (on one minute)
+   3 value check : comma separated level for load or cpu for 1min, 5min, 15min',
+        required => 1,
+        label => 'INTEGER | INT,INT,INT'
+    );
+    $np->add_arg(
+        spec => 'crit|c=s',
+        help => '1 value check : critical level for cpu in percent (on one minute)
+   3 value check : comma separated level for load or cpu for 1min, 5min, 15min',
+        required => 1,
+        label => 'INTEGER | INT,INT,INT'
+    );
+    $np->add_arg(
+        spec => 'type|T=s',
+        help => 'CPU check : 
         stand : standard MIBII (works with Windows), 
                 can handle multiple CPU.
         netsl : linux load provided by Net SNMP (1,5 & 15 minutes values)
@@ -182,93 +212,69 @@ sub help {
         nokia : Nokia CPU usage
         hp    : HP procurve switch CPU usage
         lp    : Linkproof CPU usage
-        hpux  : HP-UX load (1,5 & 15 minutes values)
--f, --perfparse
-   Perfparse compatible output
--t, --timeout=INTEGER
-   timeout for SNMP in seconds (Default: 5)
--V, --version
-   prints version number
-EOT
-}
-
-# For verbose output
-sub verb { my $t=shift; print $t,"\n" if defined($o_verb) ; }
-
-sub check_options {
-    Getopt::Long::Configure ("bundling");
-    GetOptions(
-        'v'     => \$o_verb,        'verbose'       => \$o_verb,
-        'h'     => \$o_help,        'help'          => \$o_help,
-        'H:s'   => \$o_host,        'hostname:s'    => \$o_host,
-        'p:i'   => \$o_port,        'port:i'        => \$o_port,
-        'D:s'   => \$o_domain,      'domain:s'      => \$o_domain,
-        'C:s'   => \$o_community,   'community:s'   => \$o_community,
-        'l:s'   => \$o_login,       'login:s'       => \$o_login,
-        'x:s'   => \$o_passwd,      'passwd:s'      => \$o_passwd,
-        'X:s'   => \$o_privpass,    'privpass:s'    => \$o_privpass,
-        'L:s'   => \$v3protocols,   'protocols:s'   => \$v3protocols,   
-        't:i'   => \$o_timeout,     'timeout:i'     => \$o_timeout,
-        'V'     => \$o_version,     'version'       => \$o_version,
-        '2'     => \$o_version2,    'v2c'           => \$o_version2,
-        'c:s'   => \$o_crit,        'critical:s'    => \$o_crit,
-        'w:s'   => \$o_warn,        'warn:s'        => \$o_warn,
-        'f'     => \$o_perf,        'perfparse'     => \$o_perf,
-        'T:s'   => \$o_check_type,  'type:s'        => \$o_check_type
+        hpux  : HP-UX load (1,5 & 15 minutes values)',
+        label => 'stand|netsl|netsc|as400|cisco|bc|nokia|hp|lp',
+        default => $o_check_type
     );
+    $np->add_arg(
+        spec => 'perfparse|f',
+        help => 'Perfparse compatible output'
+    );
+    
+    $np->getopts;
+    $o_host = $np->opts->hostname;
+    $o_port = $np->opts->port;
+    $o_domain = $np->opts->domain;
+    
+    $o_timeout = $np->opts->timeout;
+    
+    $o_warn = $np->opts->warn;
+    $o_crit = $np->opts->crit;
+    
+    $o_community = $np->opts->community;
+    $o_login = $np->opts->login;
+    $o_passwd = $np->opts->passwd;
+    $o_version2 = $np->opts->v2c;
+    $o_privpass = $np->opts->privpass;
+    $v3protocols = $np->opts->protocols;
+    
+    $o_verb = $np->opts->verbose;
+    
+    $o_check_type = $np->opts->type;
+    $o_perf = $np->opts->perfparse;
+    
     # check the -T option
-    my $T_option_valid=0; 
-    foreach (@valid_types) { if ($_ eq $o_check_type) {$T_option_valid=1} };
-    if ( $T_option_valid == 0 ) {
-        print "Invalid check type (-T)!\n";
-        print_usage();
-        exit $ERRORS{"UNKNOWN"}
+    my $T_option_valid = 0; 
+    foreach (@valid_types) {
+        if ($_ eq $o_check_type) {
+            $T_option_valid = 1
+        }
+    }
+    if ($T_option_valid == 0) {
+        $np->plugin_exit(UNKNOWN, "Invalid check type (-T)!");
     }
     # Basic checks
     if (defined($o_timeout) && (isnnum($o_timeout) || ($o_timeout < 2) || ($o_timeout > 60))) {
-        print "Timeout must be >1 and <60 !\n";
-        print_usage();
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "Timeout must be >1 and <60 !");
     }
     if (!defined($o_timeout)) {
         $o_timeout=5;
     }
-    if (defined ($o_help) ) {
-        help();
-        exit $ERRORS{"UNKNOWN"};
-    }
-    if (defined($o_version)) {
-        p_version();
-        exit $ERRORS{"UNKNOWN"};
-    }
-    if ( ! defined($o_host) ) {
-        # check host and filter 
-        print_usage();
-        exit $ERRORS{"UNKNOWN"};
-    }
     if ($o_domain !~ /^(udp|udp6|tcp|tcp6)$/) {
-        print "Invalid transport domain given!\n";
-        print_usage();
-        exit $ERRORS{"UNKNOWN"}
+        $np->plugin_exit(UNKNOWN, "Invalid transport domain given!");
     }
     # check snmp information
     if ( !defined($o_community) && (!defined($o_login) || !defined($o_passwd)) ) {
-        print "Put snmp login info!\n";
-        print_usage();
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "Put SNMP login info!");
     }
-    if ((defined($o_login) || defined($o_passwd)) && (defined($o_community) || defined($o_version2)) ) {
-        print "Can't mix snmp v1,2c,3 protocols!\n";
-        print_usage();
-        exit $ERRORS{"UNKNOWN"};
+    if ((defined($o_login) || defined($o_passwd)) && (defined($o_community) || defined($o_version2))) {
+        $np->plugin_exit(UNKNOWN, "Can't mix SNMP v1, 2c and v3 protocols!");
     }
     if (defined ($v3protocols)) {
         if (!defined($o_login)) {
-            print "Put snmp V3 login info with protocols!\n";
-            print_usage();
-            exit $ERRORS{"UNKNOWN"};
+            $np->plugin_exit(UNKNOWN, "Put SNMP v3 login info with protocols!");
         }
-        my @v3proto=split(/,/,$v3protocols);
+        my @v3proto = split(/,/, $v3protocols);
         if ((defined ($v3proto[0])) && ($v3proto[0] ne "")) { # Auth protocol
             $o_authproto=$v3proto[0];
         }
@@ -276,16 +282,12 @@ sub check_options {
             $o_privproto=$v3proto[1];
         }
         if ((defined ($v3proto[1])) && (!defined($o_privpass))) {
-            print "Put snmp V3 priv login info with priv protocols!\n";
-            print_usage();
-            exit $ERRORS{"UNKNOWN"};
+            $np->plugin_exit(UNKNOWN, "Put SNMP v3 priv login info with priv protocols!");
         }
     }
     # Check warnings and critical
     if (!defined($o_warn) || !defined($o_crit)) {
-        print "put warning and critical info!\n";
-        print_usage();
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "Put warning and critical info!");
     }
     # Get rid of % sign
     $o_warn =~ s/\%//g; 
@@ -293,62 +295,54 @@ sub check_options {
     # Check for multiple warning and crit in case of -L
     if (($o_check_type eq "netsl") || ($o_check_type eq "cisco") || ($o_check_type eq "cata") || 
             ($o_check_type eq "nsc") || ($o_check_type eq "hpux")) {
-        @o_warnL=split(/,/ , $o_warn);
-        @o_critL=split(/,/ , $o_crit);
+        @o_warnL = split(/,/ , $o_warn);
+        @o_critL = split(/,/ , $o_crit);
         if (($#o_warnL != 2) || ($#o_critL != 2)) {
-            print "3 warnings and critical !\n";
-            print_usage();
-            exit $ERRORS{"UNKNOWN"};
+            $np->plugin_exit(UNKNOWN, "3 warnings and critical!");
         }
-        for (my $i=0;$i<3;$i++) {
-            if ( isnnum($o_warnL[$i]) || isnnum($o_critL[$i])) {
-                print "Numeric value for warning or critical !\n";
-                print_usage();
-                exit $ERRORS{"UNKNOWN"};
+        for (my $i = 0; $i < 3; $i++) {
+            if (isnnum($o_warnL[$i]) || isnnum($o_critL[$i])) {
+                $np->plugin_exit(UNKNOWN, "Numeric value for warning or critical!");
             }
             if ($o_warnL[$i] > $o_critL[$i]) {
-                print "warning <= critical ! \n";
-                print_usage();
-                exit $ERRORS{"UNKNOWN"};
+                $np->plugin_exit(UNKNOWN, "warning <= critical!");
             }
         }
     } else {
         if (($o_warn =~ /,/) || ($o_crit =~ /,/)) {
-             { print "Multiple warning/critical levels not available for this check\n";print_usage(); exit $ERRORS{"UNKNOWN"}}
+            $np->plugin_exit(UNKNOWN, "Multiple warning/critical levels not available for this check");
         }
-        if ( isnnum($o_warn) || isnnum($o_crit) ) {
-            print "Numeric value for warning or critical !\n";
-            print_usage();
-            exit $ERRORS{"UNKNOWN"};
+        if (isnnum($o_warn) || isnnum($o_crit)) {
+            $np->plugin_exit(UNKNOWN, "Numeric value for warning or critical!");
         }
         if ($o_warn > $o_crit) {
-            print "warning <= critical ! \n";
-            print_usage();
-            exit $ERRORS{"UNKNOWN"};
+            $np->plugin_exit(UNKNOWN, "warning <= critical!");
         }
     }
 }
 
 ########## MAIN #######
 
+$np = Monitoring::Plugin->new(
+    version => $Version,
+    shortname => $Name,
+    usage => $usage,
+    license => 'GPLv2',
+    blurb => 'SNMP Load & CPU Monitor for Nagios\nGPLv2 licence, (c)2004-2007 Patrick Proy'
+);
+
 check_options();
 
-# Check gobal timeout if snmp screws up
-if (defined($TIMEOUT)) {
-    verb("Alarm at $TIMEOUT + 5");
-    alarm($TIMEOUT+5);
-} else {
-    verb("no global timeout defined : $o_timeout + 10");
-    alarm ($o_timeout+10);
-}
+# Check global timeout if SNMP screws up
+verb("Alarm at $o_timeout");
+alarm($o_timeout);
 
 $SIG{'ALRM'} = sub {
-    print "No answer from host\n";
-    exit $ERRORS{"UNKNOWN"};
+    $np->plugin_exit(UNKNOWN, "No answer from host");
 };
 
 # Connect to host
-my ($session,$error);
+my ($session, $error);
 if ( defined($o_login) && defined($o_passwd)) {
     # SNMPv3 login
     verb("SNMPv3 login");
@@ -404,8 +398,7 @@ if ( defined($o_login) && defined($o_passwd)) {
     }
 }
 if (!defined($session)) {
-    printf("ERROR opening session: %s.\n", $error);
-    exit $ERRORS{"UNKNOWN"};
+    $np->plugin_exit(UNKNOWN, join("", "Opening session: ", $error));
 }
 
 my $exit_val=undef;
@@ -417,61 +410,58 @@ if ($o_check_type eq "netsl") {
     my $resultat = $session->get_table(Baseoid => $linload_table); 
 
     if (!defined($resultat)) {
-        printf("ERROR: Description table : %s.\n", $session->error);
+        my $session_error = $session->error;
         $session->close;
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
     }
     $session->close;
 
     my @load = undef;
     my @iload = undef;
-    my @oid=undef;
-    my $exist=0;
-    foreach my $key ( keys %$resultat) {
+    my @oid = undef;
+    my $exist = 0;
+    foreach my $key (keys %$resultat) {
         verb("OID : $key, Desc : $$resultat{$key}");
         if ( $key =~ /$linload_name/ ) { 
             @oid=split (/\./,$key);
-            $iload[0]= pop(@oid) if ($$resultat{$key} eq "Load-1");
-            $iload[1]= pop(@oid) if ($$resultat{$key} eq "Load-5");
-            $iload[2]= pop(@oid) if ($$resultat{$key} eq "Load-15");
-            $exist=1;
+            $iload[0] = pop(@oid) if ($$resultat{$key} eq "Load-1");
+            $iload[1] = pop(@oid) if ($$resultat{$key} eq "Load-5");
+            $iload[2] = pop(@oid) if ($$resultat{$key} eq "Load-15");
+            $exist = 1;
         }
     }
 
     if ($exist == 0) {
-        print "Can't find snmp information on load : UNKNOWN\n";
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "Can't find SNMP information on load");
     }
 
-    for (my $i=0;$i<3;$i++) {
+    for (my $i = 0; $i < 3; $i++) {
         $load[$i] = $$resultat{$linload_load . "." . $iload[$i]};
     }
 
-    print "Load : $load[0] $load[1] $load[2] :";
+    my $output = "Load : $load[0] $load[1] $load[2]";
 
-    $exit_val=$ERRORS{"OK"};
-    for (my $i=0;$i<3;$i++) {
+    $exit_val = OK;
+    for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
-            print " $load[$i] > $o_critL[$i] : CRITICAL";
-            $exit_val=$ERRORS{"CRITICAL"};
+            $output .= " : $load[$i] > $o_critL[$i]";
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found 
-            if ($exit_val eq $ERRORS{"OK"}) {
-                print " $load[$i] > $o_warnL[$i] : WARNING"; 
-                $exit_val=$ERRORS{"WARNING"};
+            if ($exit_val eq OK) {
+                $output .= " : $load[$i] > $o_warnL[$i]"; 
+                $exit_val = WARNING;
             }
         }
     }
-    print " OK" if ($exit_val eq $ERRORS{"OK"});
     if (defined($o_perf)) { 
-        print " | load_1_min=$load[0];$o_warnL[0];$o_critL[0] ";
-        print "load_5_min=$load[1];$o_warnL[1];$o_critL[1] ";
-        print "load_15_min=$load[2];$o_warnL[2];$o_critL[2]\n";
-    } else {
-        print "\n";
+        $output .= " | load_1_min=$load[0];$o_warnL[0];$o_critL[0] ";
+        $output .= "load_5_min=$load[1];$o_warnL[1];$o_critL[1] ";
+        $output .= "load_15_min=$load[2];$o_warnL[2];$o_critL[2]";
     }
-    exit $exit_val;
+    
+    $np->plugin_exit($exit_val, $output);
 }
 
 ############## Cisco CPU check ################
@@ -481,50 +471,46 @@ if ($o_check_type eq "cisco") {
     my $resultat = $session->get_request(-varbindlist => \@oidlists);
 
     if (!defined($resultat)) {
-        printf("ERROR: Description table : %s.\n", $session->error);
+        my $session_error = $session->error;
         $session->close;
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
     }
 
     $session->close;
 
     if (!defined ($$resultat{$cisco_cpu_5s})) {
-        print "No CPU information : UNKNOWN\n";
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "No CPU information");
     }
 
     my @load = undef;
 
-    $load[0]=$$resultat{$cisco_cpu_5s};
-    $load[1]=$$resultat{$cisco_cpu_1m};
-    $load[2]=$$resultat{$cisco_cpu_5m};
+    $load[0] = $$resultat{$cisco_cpu_5s};
+    $load[1] = $$resultat{$cisco_cpu_1m};
+    $load[2] = $$resultat{$cisco_cpu_5m};
 
-    print "CPU : $load[0] $load[1] $load[2] :";
+    my $output = "CPU : $load[0] $load[1] $load[2]";
 
-    $exit_val=$ERRORS{"OK"};
-    for (my $i=0;$i<3;$i++) {
+    $exit_val = OK;
+    for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
-            print " $load[$i] > $o_critL[$i] : CRITICAL";
-            $exit_val=$ERRORS{"CRITICAL"};
+            $output .=" : $load[$i] > $o_critL[$i]";
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
-                print " $load[$i] > $o_warnL[$i] : WARNING"; 
-                $exit_val=$ERRORS{"WARNING"};
+            if ($exit_val eq OK) {
+                $output .= " : $load[$i] > $o_warnL[$i]"; 
+                $exit_val = WARNING;
             }
         }
     }
-    print " OK" if ($exit_val eq $ERRORS{"OK"});
     if (defined($o_perf)) {
-        print " | load_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        print "load_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        print "load_5_min=$load[2]%;$o_warnL[2];$o_critL[2]\n";
-    } else {
-        print "\n";
+        $output .= " | load_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
+        $output .= "load_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
+        $output .= "load_5_min=$load[2]%;$o_warnL[2];$o_critL[2]";
     }
 
-    exit $exit_val;
+    $np->plugin_exit($exit_val, $output);
 }
 
 ############## Cisco Catalyst CPU check ################
@@ -534,50 +520,46 @@ if ($o_check_type eq "cata") {
     my $resultat = $session->get_request(-varbindlist => \@oidlists);
 
     if (!defined($resultat)) {
-        printf("ERROR: Description table : %s.\n", $session->error);
+        my $session_error = $session->error;
         $session->close;
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
     }
 
     $session->close;
 
     if (!defined ($$resultat{$ciscocata_cpu_5s})) {
-        print "No CPU information : UNKNOWN\n";
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "No CPU information");
     }
 
     my @load = undef;
 
-    $load[0]=$$resultat{$ciscocata_cpu_5s};
-    $load[1]=$$resultat{$ciscocata_cpu_1m};
-    $load[2]=$$resultat{$ciscocata_cpu_5m};
+    $load[0] = $$resultat{$ciscocata_cpu_5s};
+    $load[1] = $$resultat{$ciscocata_cpu_1m};
+    $load[2] = $$resultat{$ciscocata_cpu_5m};
 
-    print "CPU : $load[0] $load[1] $load[2] :";
+    my $output = "CPU : $load[0] $load[1] $load[2]";
 
-    $exit_val=$ERRORS{"OK"};
-    for (my $i=0;$i<3;$i++) {
+    $exit_val = OK;
+    for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
-            print " $load[$i] > $o_critL[$i] : CRITICAL";
-            $exit_val=$ERRORS{"CRITICAL"};
+            $output .= " : $load[$i] > $o_critL[$i]";
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
-                print " $load[$i] > $o_warnL[$i] : WARNING"; 
-                $exit_val=$ERRORS{"WARNING"};
+            if ($exit_val eq OK) {
+                $output .= " : $load[$i] > $o_warnL[$i]"; 
+                $exit_val = WARNING;
             }
         }
     }
-    print " OK" if ($exit_val eq $ERRORS{"OK"});
     if (defined($o_perf)) {
-        print " | load_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        print "load_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        print "load_5_min=$load[2]%;$o_warnL[2];$o_critL[2]\n";
-    } else {
-        print "\n";
+        $output .= " | load_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
+        $output .= "load_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
+        $output .= "load_5_min=$load[2]%;$o_warnL[2];$o_critL[2]";
     }
 
-    exit $exit_val;
+    $np->plugin_exit($exit_val, $output);
 }
 
 ############## Netscreen CPU check ################
@@ -587,50 +569,46 @@ if ($o_check_type eq "nsc") {
     my $resultat = $session->get_request(-varbindlist => \@oidlists);
 
     if (!defined($resultat)) {
-        printf("ERROR: Description table : %s.\n", $session->error);
+        my $session_error = $session->error;
         $session->close;
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
     }
 
     $session->close;
 
     if (!defined ($$resultat{$nsc_cpu_5s})) {
-        print "No CPU information : UNKNOWN\n";
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "No CPU information");
     }
 
     my @load = undef;
 
-    $load[0]=$$resultat{$nsc_cpu_5s};
-    $load[1]=$$resultat{$nsc_cpu_1m};
-    $load[2]=$$resultat{$nsc_cpu_5m};
+    $load[0] = $$resultat{$nsc_cpu_5s};
+    $load[1] = $$resultat{$nsc_cpu_1m};
+    $load[2] = $$resultat{$nsc_cpu_5m};
 
-    print "CPU : $load[0] $load[1] $load[2] :";
+    my $output = "CPU : $load[0] $load[1] $load[2]";
 
-    $exit_val=$ERRORS{"OK"};
-    for (my $i=0;$i<3;$i++) {
+    $exit_val = OK;
+    for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
-            print " $load[$i] > $o_critL[$i] : CRITICAL";
-            $exit_val=$ERRORS{"CRITICAL"};
+            $output .= " : $load[$i] > $o_critL[$i]";
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
-                print " $load[$i] > $o_warnL[$i] : WARNING"; 
-                $exit_val=$ERRORS{"WARNING"};
+            if ($exit_val eq OK) {
+                $output .= " : $load[$i] > $o_warnL[$i]"; 
+                $exit_val = WARNING;
             }
         }
     }
-    print " OK" if ($exit_val eq $ERRORS{"OK"});
     if (defined($o_perf)) {
-        print " | cpu_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        print "cpu_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        print "cpu_5_min=$load[2]%;$o_warnL[2];$o_critL[2]\n";
-    } else {
-        print "\n";
+        $output .= " | cpu_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
+        $output .= "cpu_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
+        $output .= "cpu_5_min=$load[2]%;$o_warnL[2];$o_critL[2]";
     }
 
-    exit $exit_val;
+    $np->plugin_exit($exit_val, $output);
 }
 
 ################## CPU for : AS/400 , Netsnmp, HP, Bluecoat, linkproof, fortigate  ###########
@@ -640,41 +618,44 @@ if ( $o_check_type =~ /netsc|as400|bc|nokia|^hp$|lp|fg/ ) {
     verb("Checking OID : @oidlist");
     my $resultat = $session->get_request(-varbindlist => \@oidlist);
     if (!defined($resultat)) {
-        printf("ERROR: Description table : %s.\n", $session->error);
+        my $session_error = $session->error;
         $session->close;
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
     }
     $session->close;
 
     if (!defined ($$resultat{$cpu_oid{$o_check_type}})) {
-        print "No CPU information : UNKNOWN\n";
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "No CPU information");
     }
 
-    my $load=$$resultat{$cpu_oid{$o_check_type}};
+    my $load = $$resultat{$cpu_oid{$o_check_type}};
     verb("OID returned $load");
     # for AS400, divide by 100
-    if ($o_check_type eq "as400") {$load /= 100; };
+    if ($o_check_type eq "as400") {
+        $load /= 100;
+    }
     # for Net-snmp : oid returned idle time so load = 100-idle.
-    if ($o_check_type eq "netsc") {$load = 100 - $load; }; 
+    if ($o_check_type eq "netsc") {
+        $load = 100 - $load;
+    }
 
-    printf("CPU used %.1f%% (",$load);
+    my $output = sprintf("CPU used %.1f%% (",$load);
 
-    $exit_val=$ERRORS{"OK"};
+    $exit_val = OK;
     if ($load > $o_crit) {
-        print ">$o_crit) : CRITICAL";
-        $exit_val=$ERRORS{"CRITICAL"};
+        $output .= ">$o_crit)";
+        $exit_val = CRITICAL;
     } else {
         if ($load > $o_warn) {
-            print ">$o_warn) : WARNING";
-            $exit_val=$ERRORS{"WARNING"};
+            $output .= ">$o_warn)";
+            $exit_val = WARNING;
         }
     }
-    print "<$o_warn) : OK" if ($exit_val eq $ERRORS{"OK"});
-    (defined($o_perf)) ?
-        print " | cpu_prct_used=$load%;$o_warn;$o_crit\n"
-        : print "\n";
-    exit $exit_val;
+    if (defined($o_perf)) {
+        $output .= " | cpu_prct_used=$load%;$o_warn;$o_crit"
+    }
+    
+    $np->plugin_exit($exit_val, $output);
 }
 
 ##### Checking hpux load
@@ -686,66 +667,62 @@ if ($o_check_type eq "hpux") {
     my $resultat = $session->get_request(-varbindlist => \@oidlists);
 
     if (!defined($resultat)) {
-        printf("ERROR: Load table : %s.\n", $session->error);
+        my $session_error = $session->error;
         $session->close;
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, join("", "Load table: ", $session_error));
     }
 
     $session->close;
 
     if (!defined ($$resultat{$hpux_load_1_min})) {
-        print "No Load information : UNKNOWN\n";
-        exit $ERRORS{"UNKNOWN"};
+        $np->plugin_exit(UNKNOWN, "No Load information");
     }
 
     my @load = undef;
 
-    $load[0]=$$resultat{$hpux_load_1_min}/100;
-    $load[1]=$$resultat{$hpux_load_5_min}/100;
-    $load[2]=$$resultat{$hpux_load_15_min}/100;
+    $load[0] = $$resultat{$hpux_load_1_min}/100;
+    $load[1] = $$resultat{$hpux_load_5_min}/100;
+    $load[2] = $$resultat{$hpux_load_15_min}/100;
 
-    print "Load : $load[0] $load[1] $load[2] :";
+    my $output = "Load : $load[0] $load[1] $load[2]";
 
-    $exit_val=$ERRORS{"OK"};
-    for (my $i=0;$i<3;$i++) {
+    $exit_val = OK;
+    for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
-            print " $load[$i] > $o_critL[$i] : CRITICAL";
-            $exit_val=$ERRORS{"CRITICAL"};
+            $output .= " : $load[$i] > $o_critL[$i]";
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
-                print " $load[$i] > $o_warnL[$i] : WARNING"; 
-                $exit_val=$ERRORS{"WARNING"};
+            if ($exit_val eq OK) {
+                $output .= " : $load[$i] > $o_warnL[$i]"; 
+                $exit_val = WARNING;
             }
         }
     }
-    print " OK" if ($exit_val eq $ERRORS{"OK"});
     if (defined($o_perf)) {
-        print " | load_1_min=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        print "load_5_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        print "load_15_min=$load[2]%;$o_warnL[2];$o_critL[2]\n";
-    } else {
-        print "\n";
+        $output .= " | load_1_min=$load[0]%;$o_warnL[0];$o_critL[0] ";
+        $output .= "load_5_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
+        $output .= "load_15_min=$load[2]%;$o_warnL[2];$o_critL[2]";
     }
 
-    exit $exit_val;
+    $np->plugin_exit($exit_val, $output);
 }
 
 ########## Standard cpu usage check ############
 # Get desctiption table
-my $resultat =  $session->get_table(Baseoid => $base_proc);
+my $resultat = $session->get_table(Baseoid => $base_proc);
 
 if (!defined($resultat)) {
-    printf("ERROR: Description table : %s.\n", $session->error);
+    my $session_error = $session->error;
     $session->close;
-    exit $ERRORS{"UNKNOWN"};
+    $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
 }
 
 $session->close;
 
-my ($cpu_used,$ncpu)=(0,0);
-foreach my $key ( keys %$resultat) {
+my ($cpu_used, $ncpu) = (0, 0);
+foreach my $key (keys %$resultat) {
     verb("OID : $key, Desc : $$resultat{$key}");
     if ( $key =~ /$proc_load/) {
         $cpu_used += $$resultat{$key};
@@ -753,28 +730,27 @@ foreach my $key ( keys %$resultat) {
     }
 }
 
-if ($ncpu==0) {
-    print "Can't find CPU usage information : UNKNOWN\n";
-    exit $ERRORS{"UNKNOWN"};
+if ($ncpu == 0) {
+    $np->plugin_exit(UNKNOWN, "Can't find CPU usage information");
 }
 
 $cpu_used /= $ncpu;
 
-print "$ncpu CPU, ", $ncpu==1 ? "load" : "average load";
-printf(" %.1f%%",$cpu_used);
-$exit_val=$ERRORS{"OK"};
+my $output = join("", "$ncpu CPU, ", $ncpu == 1 ? "load" : "average load");
+$output .= sprintf(" %.1f%%",$cpu_used);
+$exit_val = OK;
 
 if ($cpu_used > $o_crit) {
-    print " > $o_crit% : CRITICAL";
-    $exit_val=$ERRORS{"CRITICAL"};
+    $output .= " > $o_crit%";
+    $exit_val = CRITICAL;
 } else {
     if ($cpu_used > $o_warn) {
-        print " > $o_warn% : WARNING";
-        $exit_val=$ERRORS{"WARNING"};
+        $output .= " > $o_warn%";
+        $exit_val = WARNING;
     }
 }
-print " < $o_warn% : OK" if ($exit_val eq $ERRORS{"OK"});
-(defined($o_perf)) ?
-    print " | cpu_prct_used=$cpu_used%;$o_warn;$o_crit\n"
-    : print "\n";
-exit $exit_val;
+$output .= " < $o_warn%" if ($exit_val eq OK);
+if (defined($o_perf)) {
+    $output .= " | cpu_prct_used=$cpu_used%;$o_warn;$o_crit";
+}
+$np->plugin_exit($exit_val, $output);
