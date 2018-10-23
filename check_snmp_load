@@ -19,8 +19,6 @@ use Monitoring::Plugin;
 my $Name = 'check_snmp_load';
 
 my $np;
-# Nagios specific
-my %ERRORS=('OK'=>0,'WARNING'=>1,'CRITICAL'=>2,'UNKNOWN'=>3,'DEPENDENT'=>4);
 
 # SNMP Datas
 
@@ -447,17 +445,17 @@ if ($o_check_type eq "netsl") {
 
     my $output = "Load : $load[0] $load[1] $load[2]";
 
-    $exit_val = $ERRORS{"OK"};
+    $exit_val = OK;
     for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
             $output .= " : $load[$i] > $o_critL[$i]";
-            $exit_val=$ERRORS{"CRITICAL"};
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found 
-            if ($exit_val eq $ERRORS{"OK"}) {
+            if ($exit_val eq OK) {
                 $output .= " : $load[$i] > $o_warnL[$i]"; 
-                $exit_val = $ERRORS{"WARNING"};
+                $exit_val = WARNING;
             }
         }
     }
@@ -496,17 +494,17 @@ if ($o_check_type eq "cisco") {
 
     my $output = "CPU : $load[0] $load[1] $load[2]";
 
-    $exit_val = $ERRORS{"OK"};
+    $exit_val = OK;
     for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
             $output .=" : $load[$i] > $o_critL[$i]";
-            $exit_val = $ERRORS{"CRITICAL"};
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
+            if ($exit_val eq OK) {
                 $output .= " : $load[$i] > $o_warnL[$i]"; 
-                $exit_val = $ERRORS{"WARNING"};
+                $exit_val = WARNING;
             }
         }
     }
@@ -545,17 +543,17 @@ if ($o_check_type eq "cata") {
 
     my $output = "CPU : $load[0] $load[1] $load[2]";
 
-    $exit_val = $ERRORS{"OK"};
+    $exit_val = OK;
     for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
             $output .= " : $load[$i] > $o_critL[$i]";
-            $exit_val = $ERRORS{"CRITICAL"};
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
+            if ($exit_val eq OK) {
                 $output .= " : $load[$i] > $o_warnL[$i]"; 
-                $exit_val = $ERRORS{"WARNING"};
+                $exit_val = WARNING;
             }
         }
     }
@@ -594,17 +592,17 @@ if ($o_check_type eq "nsc") {
 
     my $output = "CPU : $load[0] $load[1] $load[2]";
 
-    $exit_val = $ERRORS{"OK"};
+    $exit_val = OK;
     for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
             $output .= " : $load[$i] > $o_critL[$i]";
-            $exit_val = $ERRORS{"CRITICAL"};
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
+            if ($exit_val eq OK) {
                 $output .= " : $load[$i] > $o_warnL[$i]"; 
-                $exit_val = $ERRORS{"WARNING"};
+                $exit_val = WARNING;
             }
         }
     }
@@ -647,14 +645,14 @@ if ( $o_check_type =~ /netsc|as400|bc|nokia|^hp$|lp|fg/ ) {
 
     my $output = sprintf("CPU used %.1f%% (",$load);
 
-    $exit_val = $ERRORS{"OK"};
+    $exit_val = OK;
     if ($load > $o_crit) {
         $output .= ">$o_crit)";
-        $exit_val=$ERRORS{"CRITICAL"};
+        $exit_val = CRITICAL;
     } else {
         if ($load > $o_warn) {
             $output .= ">$o_warn)";
-            $exit_val=$ERRORS{"WARNING"};
+            $exit_val = WARNING;
         }
     }
     if (defined($o_perf)) {
@@ -692,17 +690,17 @@ if ($o_check_type eq "hpux") {
 
     my $output = "Load : $load[0] $load[1] $load[2]";
 
-    $exit_val = $ERRORS{"OK"};
+    $exit_val = OK;
     for (my $i = 0; $i < 3; $i++) {
         if ( $load[$i] > $o_critL[$i] ) {
             $output .= " : $load[$i] > $o_critL[$i]";
-            $exit_val = $ERRORS{"CRITICAL"};
+            $exit_val = CRITICAL;
         }
         if ( $load[$i] > $o_warnL[$i] ) {
             # output warn error only if no critical was found
-            if ($exit_val eq $ERRORS{"OK"}) {
+            if ($exit_val eq OK) {
                 $output .= " : $load[$i] > $o_warnL[$i]"; 
-                $exit_val=$ERRORS{"WARNING"};
+                $exit_val = WARNING;
             }
         }
     }
@@ -744,18 +742,18 @@ $cpu_used /= $ncpu;
 
 my $output = join("", "$ncpu CPU, ", $ncpu == 1 ? "load" : "average load");
 $output .= sprintf(" %.1f%%",$cpu_used);
-$exit_val = $ERRORS{"OK"};
+$exit_val = OK;
 
 if ($cpu_used > $o_crit) {
     $output .= " > $o_crit%";
-    $exit_val = $ERRORS{"CRITICAL"};
+    $exit_val = CRITICAL;
 } else {
     if ($cpu_used > $o_warn) {
         $output .= " > $o_warn%";
-        $exit_val = $ERRORS{"WARNING"};
+        $exit_val = WARNING;
     }
 }
-$output .= " < $o_warn%" if ($exit_val eq $ERRORS{"OK"});
+$output .= " < $o_warn%" if ($exit_val eq OK);
 if (defined($o_perf)) {
     $output .= " | cpu_prct_used=$cpu_used%;$o_warn;$o_crit";
 }
