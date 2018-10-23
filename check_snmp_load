@@ -119,10 +119,6 @@ my $o_privpass      = undef;    # priv password
 
 my $usage = "Usage: $0 [-v] -H <host> -C <snmp_community> [-2] | (-l login -x passwd [-X pass -L <authp>,<privp>])  [-p <port>] -w <warn level> -c <crit level> -T=[stand|netsl|netsc|as400|cisco|cata|nsc|fg|bc|nokia|hp|lp|hpux] [-f] [-t <timeout>] [-V]\n";
 
-sub print_usage {
-    print $usage;
-}
-
 sub isnnum { # Return true if arg is not a number
     my $num = shift;
     if ( $num =~ /^(\d+\.?\d*)|(^\.\d+)$/ ) {
