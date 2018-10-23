@@ -20,8 +20,6 @@ my $Name = 'check_snmp_load';
 
 my $np;
 # Nagios specific
-
-my $TIMEOUT = 15;
 my %ERRORS=('OK'=>0,'WARNING'=>1,'CRITICAL'=>2,'UNKNOWN'=>3,'DEPENDENT'=>4);
 
 # SNMP Datas
@@ -108,7 +106,7 @@ my $o_warn          = undef;    # warning level
 my @o_warnL         = undef;    # warning levels for Linux Load or Cisco CPU
 my $o_crit          = undef;    # critical level
 my @o_critL         = undef;    # critical level for Linux Load or Cisco CPU
-my $o_timeout       = undef;    # Timeout (Default 5)
+my $o_timeout       = undef;    # Timeout
 my $o_perf          = undef;    # Output performance data
 my $o_version2      = undef;    # use snmp v2c
 # SNMPv3 specific
@@ -341,14 +339,9 @@ $np = Monitoring::Plugin->new(
 
 check_options();
 
-# Check gobal timeout if snmp screws up
-if (defined($TIMEOUT)) {
-    verb("Alarm at $TIMEOUT + 5");
-    alarm($TIMEOUT+5);
-} else {
-    verb("no global timeout defined : $o_timeout + 10");
-    alarm ($o_timeout+10);
-}
+# Check global timeout if SNMP screws up
+verb("Alarm at $o_timeout");
+alarm($o_timeout);
 
 $SIG{'ALRM'} = sub {
     $np->plugin_exit(UNKNOWN, "No answer from host");
