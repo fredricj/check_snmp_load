@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w 
 ############################## check_snmp_load #################
-my $Version='1.13';
-# Date : Sep 07 2018
+my $Version='1.14';
+# Date : Oct 24 2018
 # Author  : Patrick Proy ( patrick at proy.org)
 # Help : http://nagios.manubulon.com/
 # Licence : GPL - http://www.fsf.org/licenses/gpl.txt
