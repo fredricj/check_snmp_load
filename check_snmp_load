@@ -286,9 +286,6 @@ sub check_options {
         }
     }
     # Check warnings and critical
-    if (!defined($o_warn) || !defined($o_crit)) {
-        $np->plugin_exit(UNKNOWN, "Put warning and critical info!");
-    }
     # Get rid of % sign
     $o_warn =~ s/\%//g; 
     $o_crit =~ s/\%//g;
