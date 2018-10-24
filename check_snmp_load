@@ -477,87 +477,27 @@ if ($o_check_type eq "netsl") {
 }
 
 ############## Cisco CPU check ################
-
-if ($o_check_type eq "cisco") {
-    my @oidlists = ($cisco_cpu_5m, $cisco_cpu_1m, $cisco_cpu_5s);
-    my $resultat = $session->get_request(-varbindlist => \@oidlists);
-
-    if (!defined($resultat)) {
-        my $session_error = $session->error;
-        $session->close;
-        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
-    }
-
-    $session->close;
-
-    if (!defined ($$resultat{$cisco_cpu_5s})) {
-        $np->plugin_exit(UNKNOWN, "No CPU information");
-    }
-
-    my @load = undef;
-
-    $load[0] = $$resultat{$cisco_cpu_5s};
-    $load[1] = $$resultat{$cisco_cpu_1m};
-    $load[2] = $$resultat{$cisco_cpu_5m};
-
-    my $output = "CPU : $load[0] $load[1] $load[2]";
-
-    my $checkoutput;
-    ($exit_val, $checkoutput) = check_load(\@load, \@o_critL, \@o_warnL);
-    $output .= $checkoutput;
-    
-    if (defined($o_perf)) {
-        $output .= " | load_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        $output .= "load_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        $output .= "load_5_min=$load[2]%;$o_warnL[2];$o_critL[2]";
-    }
-
-    $np->plugin_exit($exit_val, $output);
-}
-
 ############## Cisco Catalyst CPU check ################
-
-if ($o_check_type eq "cata") {
-    my @oidlists = ($ciscocata_cpu_5m, $ciscocata_cpu_1m, $ciscocata_cpu_5s);
-    my $resultat = $session->get_request(-varbindlist => \@oidlists);
-
-    if (!defined($resultat)) {
-        my $session_error = $session->error;
-        $session->close;
-        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
-    }
-
-    $session->close;
-
-    if (!defined ($$resultat{$ciscocata_cpu_5s})) {
-        $np->plugin_exit(UNKNOWN, "No CPU information");
-    }
-
-    my @load = undef;
-
-    $load[0] = $$resultat{$ciscocata_cpu_5s};
-    $load[1] = $$resultat{$ciscocata_cpu_1m};
-    $load[2] = $$resultat{$ciscocata_cpu_5m};
-
-    my $output = "CPU : $load[0] $load[1] $load[2]";
-
-    my $checkoutput;
-    ($exit_val, $checkoutput) = check_load(\@load, \@o_critL, \@o_warnL);
-    $output .= $checkoutput;
-    
-    if (defined($o_perf)) {
-        $output .= " | load_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        $output .= "load_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        $output .= "load_5_min=$load[2]%;$o_warnL[2];$o_critL[2]";
-    }
-
-    $np->plugin_exit($exit_val, $output);
-}
-
 ############## Netscreen CPU check ################
+############## Checking hpux load ##############
 
-if ($o_check_type eq "nsc") {
-    my @oidlists = ($nsc_cpu_5m, $nsc_cpu_1m, $nsc_cpu_5s);
+if ($o_check_type =~ /cisco|cata|nsc|hpux/) {
+    my @oidlists;
+    my @loadtexts = ("load_5_secs", "load_1_min", "load_5_min");
+    my $typetext = "CPU";
+    if ($o_check_type eq "cisco") {
+        @oidlists = ($cisco_cpu_5s, $cisco_cpu_1m, $cisco_cpu_5m);
+    } elsif ($o_check_type eq "cata") {
+        @oidlists = ($ciscocata_cpu_5s, $ciscocata_cpu_1m, $ciscocata_cpu_5m);
+    } elsif ($o_check_type eq "nsc") {
+        @oidlists = ($nsc_cpu_5s, $nsc_cpu_1m, $nsc_cpu_5m);
+        @loadtexts = ("cpu_5_sec", "cpu_1_min", "cpu_5_min");
+    } elsif ($o_check_type eq "hpux") {
+        @oidlists = ($hpux_load_1_min, $hpux_load_5_min, $hpux_load_15_min);
+        @loadtexts = ("load_1_min", "load_5_min", "load_15_min");
+        $typetext = "Load";
+    }
+    
     my $resultat = $session->get_request(-varbindlist => \@oidlists);
 
     if (!defined($resultat)) {
@@ -568,26 +508,32 @@ if ($o_check_type eq "nsc") {
 
     $session->close;
 
-    if (!defined ($$resultat{$nsc_cpu_5s})) {
-        $np->plugin_exit(UNKNOWN, "No CPU information");
+    if (!defined ($$resultat{$oidlists[0]})) {
+        $np->plugin_exit(UNKNOWN, "No $typetext information");
     }
 
     my @load = undef;
 
-    $load[0] = $$resultat{$nsc_cpu_5s};
-    $load[1] = $$resultat{$nsc_cpu_1m};
-    $load[2] = $$resultat{$nsc_cpu_5m};
+    $load[0] = $$resultat{$oidlists[0]};
+    $load[1] = $$resultat{$oidlists[1]};
+    $load[2] = $$resultat{$oidlists[2]};
+    
+    if ($o_check_type eq "hpux") {
+        foreach my $item (@load) {
+            $item /= 100;
+        }
+    }
 
-    my $output = "CPU : $load[0] $load[1] $load[2]";
+    my $output = "$typetext : $load[0] $load[1] $load[2]";
 
     my $checkoutput;
     ($exit_val, $checkoutput) = check_load(\@load, \@o_critL, \@o_warnL);
     $output .= $checkoutput;
     
     if (defined($o_perf)) {
-        $output .= " | cpu_5_sec=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        $output .= "cpu_1_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        $output .= "cpu_5_min=$load[2]%;$o_warnL[2];$o_critL[2]";
+        $output .= " | $loadtexts[0]=$load[0]%;$o_warnL[0];$o_critL[0] ";
+        $output .= "$loadtexts[1]=$load[1]%;$o_warnL[1];$o_critL[1] ";
+        $output .= "$loadtexts[2]=$load[2]%;$o_warnL[2];$o_critL[2]";
     }
 
     $np->plugin_exit($exit_val, $output);
@@ -637,47 +583,6 @@ if ( $o_check_type =~ /netsc|as400|bc|nokia|^hp$|lp|fg/ ) {
         $output .= " | cpu_prct_used=$load%;$o_warn;$o_crit"
     }
     
-    $np->plugin_exit($exit_val, $output);
-}
-
-##### Checking hpux load
-if ($o_check_type eq "hpux") {
-
-    verb("Checking hpux load");
-
-    my @oidlists = ($hpux_load_1_min, $hpux_load_5_min, $hpux_load_15_min);
-    my $resultat = $session->get_request(-varbindlist => \@oidlists);
-
-    if (!defined($resultat)) {
-        my $session_error = $session->error;
-        $session->close;
-        $np->plugin_exit(UNKNOWN, join("", "Load table: ", $session_error));
-    }
-
-    $session->close;
-
-    if (!defined ($$resultat{$hpux_load_1_min})) {
-        $np->plugin_exit(UNKNOWN, "No Load information");
-    }
-
-    my @load = undef;
-
-    $load[0] = $$resultat{$hpux_load_1_min}/100;
-    $load[1] = $$resultat{$hpux_load_5_min}/100;
-    $load[2] = $$resultat{$hpux_load_15_min}/100;
-
-    my $output = "Load : $load[0] $load[1] $load[2]";
-
-    my $checkoutput;
-    ($exit_val, $checkoutput) = check_load(\@load, \@o_critL, \@o_warnL);
-    $output .= $checkoutput;
-    
-    if (defined($o_perf)) {
-        $output .= " | load_1_min=$load[0]%;$o_warnL[0];$o_critL[0] ";
-        $output .= "load_5_min=$load[1]%;$o_warnL[1];$o_critL[1] ";
-        $output .= "load_15_min=$load[2]%;$o_warnL[2];$o_critL[2]";
-    }
-
     $np->plugin_exit($exit_val, $output);
 }
 
