@@ -610,7 +610,8 @@ if ($o_check_type eq "stand") {
     $cpu_used /= $ncpu;
 
     $output = join("", "$ncpu CPU, ", $ncpu == 1 ? "load" : "average load");
-    $output .= sprintf(" %.1f%%",$cpu_used);
+    my $cpu_used_rounded = sprintf("%.1f",$cpu_used);
+    $output .= " ".$cpu_used_rounded. "%";
     $exit_val = OK;
 
     if ($cpu_used > $o_crit) {
@@ -624,7 +625,7 @@ if ($o_check_type eq "stand") {
     }
     $output .= " < $o_warn%" if ($exit_val eq OK);
     if (defined($o_perf)) {
-        $output .= " | cpu_prct_used=$cpu_used%;$o_warn;$o_crit";
+        $output .= " | cpu_prct_used=$cpu_used_rounded%;$o_warn;$o_crit";
     }
 }
 
