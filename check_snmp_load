@@ -707,47 +707,49 @@ if ($o_check_type eq "hpux") {
 }
 
 ########## Standard cpu usage check ############
-# Get desctiption table
-my $resultat = $session->get_table(Baseoid => $base_proc);
+if ($o_check_type eq "stand") {
+    # Get desctiption table
+    my $resultat = $session->get_table(Baseoid => $base_proc);
 
-if (!defined($resultat)) {
-    my $session_error = $session->error;
+    if (!defined($resultat)) {
+        my $session_error = $session->error;
+        $session->close;
+        $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
+    }
+
     $session->close;
-    $np->plugin_exit(UNKNOWN, join("", "Description table: ", $session_error));
-}
 
-$session->close;
-
-my ($cpu_used, $ncpu) = (0, 0);
-foreach my $key (keys %$resultat) {
-    verb("OID : $key, Desc : $$resultat{$key}");
-    if ( $key =~ /$proc_load/) {
-        $cpu_used += $$resultat{$key};
-        $ncpu++;
+    my ($cpu_used, $ncpu) = (0, 0);
+    foreach my $key (keys %$resultat) {
+        verb("OID : $key, Desc : $$resultat{$key}");
+        if ( $key =~ /$proc_load/) {
+            $cpu_used += $$resultat{$key};
+            $ncpu++;
+        }
     }
-}
 
-if ($ncpu == 0) {
-    $np->plugin_exit(UNKNOWN, "Can't find CPU usage information");
-}
-
-$cpu_used /= $ncpu;
-
-my $output = join("", "$ncpu CPU, ", $ncpu == 1 ? "load" : "average load");
-$output .= sprintf(" %.1f%%",$cpu_used);
-$exit_val = OK;
-
-if ($cpu_used > $o_crit) {
-    $output .= " > $o_crit%";
-    $exit_val = CRITICAL;
-} else {
-    if ($cpu_used > $o_warn) {
-        $output .= " > $o_warn%";
-        $exit_val = WARNING;
+    if ($ncpu == 0) {
+        $np->plugin_exit(UNKNOWN, "Can't find CPU usage information");
     }
+
+    $cpu_used /= $ncpu;
+
+    my $output = join("", "$ncpu CPU, ", $ncpu == 1 ? "load" : "average load");
+    $output .= sprintf(" %.1f%%",$cpu_used);
+    $exit_val = OK;
+
+    if ($cpu_used > $o_crit) {
+        $output .= " > $o_crit%";
+        $exit_val = CRITICAL;
+    } else {
+        if ($cpu_used > $o_warn) {
+            $output .= " > $o_warn%";
+            $exit_val = WARNING;
+        }
+    }
+    $output .= " < $o_warn%" if ($exit_val eq OK);
+    if (defined($o_perf)) {
+        $output .= " | cpu_prct_used=$cpu_used%;$o_warn;$o_crit";
+    }
+    $np->plugin_exit($exit_val, $output);
 }
-$output .= " < $o_warn%" if ($exit_val eq OK);
-if (defined($o_perf)) {
-    $output .= " | cpu_prct_used=$cpu_used%;$o_warn;$o_crit";
-}
-$np->plugin_exit($exit_val, $output);
