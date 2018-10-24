@@ -424,6 +424,7 @@ if (!defined($session)) {
 }
 
 my $exit_val=undef;
+my $output="";
 ########### Linux load check ##############
 
 if ($o_check_type eq "netsl") {
@@ -461,7 +462,7 @@ if ($o_check_type eq "netsl") {
         $load[$i] = $$resultat{$linload_load . "." . $iload[$i]};
     }
 
-    my $output = "Load : $load[0] $load[1] $load[2]";
+    $output = "Load : $load[0] $load[1] $load[2]";
 
     my $checkoutput;
     ($exit_val, $checkoutput) = check_load(\@load, \@o_critL, \@o_warnL);
@@ -472,8 +473,6 @@ if ($o_check_type eq "netsl") {
         $output .= "load_5_min=$load[1];$o_warnL[1];$o_critL[1] ";
         $output .= "load_15_min=$load[2];$o_warnL[2];$o_critL[2]";
     }
-    
-    $np->plugin_exit($exit_val, $output);
 }
 
 ############## Cisco CPU check ################
@@ -524,7 +523,7 @@ if ($o_check_type =~ /cisco|cata|nsc|hpux/) {
         }
     }
 
-    my $output = "$typetext : $load[0] $load[1] $load[2]";
+    $output = "$typetext : $load[0] $load[1] $load[2]";
 
     my $checkoutput;
     ($exit_val, $checkoutput) = check_load(\@load, \@o_critL, \@o_warnL);
@@ -535,8 +534,6 @@ if ($o_check_type =~ /cisco|cata|nsc|hpux/) {
         $output .= "$loadtexts[1]=$load[1]%;$o_warnL[1];$o_critL[1] ";
         $output .= "$loadtexts[2]=$load[2]%;$o_warnL[2];$o_critL[2]";
     }
-
-    $np->plugin_exit($exit_val, $output);
 }
 
 ################## CPU for : AS/400 , Netsnmp, HP, Bluecoat, linkproof, fortigate  ###########
@@ -567,7 +564,7 @@ if ( $o_check_type =~ /netsc|as400|bc|nokia|^hp$|lp|fg/ ) {
         $load = 100 - $load;
     }
 
-    my $output = sprintf("CPU used %.1f%% (",$load);
+    $output = sprintf("CPU used %.1f%% (",$load);
 
     $exit_val = OK;
     if ($load > $o_crit) {
@@ -582,8 +579,6 @@ if ( $o_check_type =~ /netsc|as400|bc|nokia|^hp$|lp|fg/ ) {
     if (defined($o_perf)) {
         $output .= " | cpu_prct_used=$load%;$o_warn;$o_crit"
     }
-    
-    $np->plugin_exit($exit_val, $output);
 }
 
 ########## Standard cpu usage check ############
@@ -614,7 +609,7 @@ if ($o_check_type eq "stand") {
 
     $cpu_used /= $ncpu;
 
-    my $output = join("", "$ncpu CPU, ", $ncpu == 1 ? "load" : "average load");
+    $output = join("", "$ncpu CPU, ", $ncpu == 1 ? "load" : "average load");
     $output .= sprintf(" %.1f%%",$cpu_used);
     $exit_val = OK;
 
@@ -631,5 +626,6 @@ if ($o_check_type eq "stand") {
     if (defined($o_perf)) {
         $output .= " | cpu_prct_used=$cpu_used%;$o_warn;$o_crit";
     }
-    $np->plugin_exit($exit_val, $output);
 }
+
+$np->plugin_exit($exit_val, $output);
